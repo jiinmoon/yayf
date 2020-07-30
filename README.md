@@ -1,6 +1,8 @@
 yayf : Yet, Another Youtube Feed-aggregator
 ===========================================
 
+![yayf-do-I-really-need-it?](resources/yayf-frontpage.jpg)
+
 This is a small project with go that iterates over the registered youtube
 subscription feeds, and notifies you of any new uploads. And returns the full
 list of youtube-urls that which can be used to download further.
@@ -12,9 +14,9 @@ I am doing this for more of a challenge to myself.
 TODO
 ----
 
-- Figure out xml schema of youtube RSS feeds.
-- Fetch a single channel feeds.
-- Use goroutine to apply over multiple channels at same time.
+- [x] Figure out xml schema of youtube RSS feeds.
+- [ ] Fetch a single channel feeds.
+- [ ] Use goroutine to apply over multiple channels at same time.
 
 
 
