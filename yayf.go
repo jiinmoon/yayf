@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -21,6 +22,10 @@ var (
 	wg sync.WaitGroup
 )
 
+type Channel_Ids struct {
+	Subscriptions []string
+}
+
 type Subscriptions struct {
 	Title   string  `xml:"title"`
 	Entries []Entry `xml:"entry"`
@@ -29,6 +34,19 @@ type Subscriptions struct {
 type Entry struct {
 	Id    string `xml:"videoId"`
 	Title string `xml:"title"`
+}
+
+func get_subs(path string) []string {
+	var CI Channel_Ids
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = json.Unmarshal(data, &CI)
+	if err != nil {
+		fmt.Println(err)
+	}
+	return CI.Subscriptions
 }
 
 func get_feed(url string, c chan Subscriptions) {
@@ -44,11 +62,12 @@ func get_feed(url string, c chan Subscriptions) {
 }
 
 func main() {
+	CI := get_subs("./yayf.config")
 	var (
 		curr_url string
-		c        = make(chan Subscriptions, len(CHANNEL_IDS))
+		c        = make(chan Subscriptions, len(CI))
 	)
-	for _, ch_id := range CHANNEL_IDS {
+	for _, ch_id := range CI {
 		curr_url = fmt.Sprintf(YT_FEED_URL, ch_id)
 		wg.Add(1)
 		go get_feed(curr_url, c)
