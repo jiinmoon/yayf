@@ -27,14 +27,8 @@ TODO
 - [x] Fetch a single channel feeds.
 - [x] Use goroutine to apply over multiple channels at same time.
 - [x] First proto yayf.go finished; proof of concept is valid.
-- [ ] Implement GetFeeds().
-
-
-
-
-
-
-
+- [x] Implement GetFeeds().
+- [ ] Resolve record v feeds.
 
 Contacts
 --------
