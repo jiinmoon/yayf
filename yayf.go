@@ -1,29 +1,40 @@
-/* yayf.go
-
-TODO:
-
-- [X] handle file ios for channel lists.
-- [ ] handle file ios for previous records.
-
-
-*/
+/* yayf.go */
 
 package main
 
 import (
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
+	"sync"
 )
 
 const (
 	SubscriptionsPath = "yayf.subs"
 	RecordsPath       = "yayf.record"
+	YTFeedUrl         = "https://www.youtube.com/feeds/videos.xml?channel_id=%s"
+)
+
+var (
+	WG sync.WaitGroup
 )
 
 type ChannelIDs struct {
 	Cids []string `json:"Subscriptions"`
+}
+
+type Feeds struct {
+	ChannelID string
+	Title     string  `xml:"title"`
+	Entries   []Entry `xml:"entry"`
+}
+
+type Entry struct {
+	Link  string `xml:"videoId"`
+	Title string `xml:"title"`
 }
 
 func GetSubs() []string {
@@ -49,24 +60,52 @@ func GetRecords() map[string]map[string]string {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//fmt.Println(records)
-	//fmt.Println(records["cid1"])
-	//fmt.Println(records["cid1"].(map[string]interface{})["link1"])
 	return records
 }
 
+func GetFeeds(ch chan Feeds, cid string) {
+	defer WG.Done()
+	var (
+		feeds Feeds
+	)
+	resp, err := http.Get(fmt.Sprintf(YTFeedUrl, cid))
+	if err != nil {
+		log.Fatal(err)
+	}
+	blobs, err := ioutil.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+	xml.Unmarshal(blobs, &feeds)
+	feeds.ChannelID = cid
+	ch <- feeds
+}
+
 func main() {
-	// First, need to read from subscriptions file - grab all the channel
-	// ids into ChannelIDs struct.
 	cids := GetSubs()
-	for _, c := range cids {
-		fmt.Println(c)
-	}
-	// Now, we need to read the previous records so that we know which
-	// entries are new (new subscriptions added? new entries for existing
-	// subscriptions?)
+	var (
+		ch    = make(chan Feeds, len(cids))
+		feeds = make(map[string]map[string]string)
+	)
 	records := GetRecords()
-	for _, r := range records {
-		fmt.Println(r)
+	for _, id := range cids {
+		WG.Add(1)
+		go GetFeeds(ch, id)
 	}
+	WG.Wait()
+	close(ch)
+	for feed := range ch {
+		feeds[feed.ChannelID] = map[string]string{}
+		for _, e := range feed.Entries {
+			feeds[feed.ChannelID][e.Link] = e.Title[:30] + "..."
+		}
+	}
+	for k, v := range feeds {
+		fmt.Println("((( " + k + " )))")
+		for kk, vv := range v {
+			fmt.Println(kk, vv)
+		}
+	}
+	fmt.Println(records)
 }
