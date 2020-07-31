@@ -26,7 +26,7 @@ type ChannelIDs struct {
 	Cids []string `json:"Subscriptions"`
 }
 
-func getSubs() []string {
+func GetSubs() []string {
 	var CI ChannelIDs
 	data, err := ioutil.ReadFile(SubscriptionsPath)
 	if err != nil {
@@ -42,7 +42,7 @@ func getSubs() []string {
 func main() {
 	// First, need to read from subscriptions file - grab all the channel
 	// ids into ChannelIDs struct.
-	Cids := getSubs()
+	Cids := GetSubs()
 	for _, c := range Cids {
 		fmt.Println(c)
 	}
