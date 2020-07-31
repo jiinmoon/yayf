@@ -52,19 +52,26 @@ func GetSubs() []string {
 	return cids.Cids
 }
 
+func IsExist(filePath string) bool {
+	if _, err := os.Stat(filePath); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}
+
 func GetRecords() map[string]map[string]string {
 	var records map[string]map[string]string
 	data, err := ioutil.ReadFile(RecordsPath)
 	if err != nil {
 		// error due to non-exisitent file?
-		if _, err := os.Stat(RecordsPath); err != nil {
-			if os.IsNotExist(err) {
-				// record does not exist. create one.
-				ioutil.WriteFile(RecordsPath, []byte{}, 0644)
-			} else {
-				// record exists, but other err.
-				log.Fatal(err)
-			}
+		if IsExist(RecordsPath) {
+			// record does not exist. create one.
+			ioutil.WriteFile(RecordsPath, []byte{}, 0644)
+		} else {
+			// record exists, but other err.
+			log.Fatal(err)
 		}
 		return records
 	} else {
