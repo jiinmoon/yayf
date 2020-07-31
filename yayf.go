@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 )
 
@@ -42,6 +43,7 @@ func GetSubs() []string {
 	data, err := ioutil.ReadFile(SubscriptionsPath)
 	if err != nil {
 		log.Fatal(err)
+		fmt.Println("Subscrions file is missing: yayf.subs")
 	}
 	err = json.Unmarshal(data, &cids)
 	if err != nil {
@@ -54,13 +56,24 @@ func GetRecords() map[string]map[string]string {
 	var records map[string]map[string]string
 	data, err := ioutil.ReadFile(RecordsPath)
 	if err != nil {
-		log.Fatal(err)
+		// error due to non-exisitent file?
+		if _, err := os.Stat(RecordsPath); err != nil {
+			if os.IsNotExist(err) {
+				// record does not exist. create one.
+				ioutil.WriteFile(RecordsPath, []byte{}, 0644)
+			} else {
+				// record exists, but other err.
+				log.Fatal(err)
+			}
+		}
+		return records
+	} else {
+		err = json.Unmarshal(data, &records)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return records
 	}
-	err = json.Unmarshal(data, &records)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return records
 }
 
 func GetFeeds(ch chan Feeds, cid string) {
