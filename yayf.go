@@ -1,5 +1,11 @@
 /* yayf.go */
 
+// Why don't we make the record simpler?
+// Just a list of links instead.
+// This way, we can quickly check the current subscription list.
+
+// Playlists!
+
 package main
 
 import (
