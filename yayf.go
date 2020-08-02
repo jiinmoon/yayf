@@ -4,7 +4,8 @@
 // Just a list of links instead.
 // This way, we can quickly check the current subscription list.
 
-// Playlists!
+// Adding support for playlists as well.
+// It follows the same format as the channels!
 
 package main
 
@@ -21,16 +22,18 @@ import (
 
 const (
 	SubscriptionsPath = "yayf.subs"
-	RecordsPath       = "yayf.record"
-	YTFeedUrl         = "https://www.youtube.com/feeds/videos.xml?channel_id=%s"
+	RecordsPath       = "records.tpl" //"yayf.record"
+	YTFeedUrl         = "https://www.youtube.com/feeds/videos.xml?%s=%s"
 )
 
 var (
 	WG sync.WaitGroup
 )
 
-type ChannelIDs struct {
+type Subscriptions struct {
 	Cids []string `json:"Subscriptions"`
+	Pids []string `json:"Playlists"`
+	Len  int
 }
 
 type Feeds struct {
@@ -44,21 +47,23 @@ type Entry struct {
 	Title string `xml:"title"`
 }
 
-func GetSubs() []string {
-	var cids ChannelIDs
+func GetSubs() *Subscriptions {
+	var subs Subscriptions
 	data, err := ioutil.ReadFile(SubscriptionsPath)
 	if err != nil {
 		log.Fatal(err)
 		fmt.Println("Subscrions file is missing: yayf.subs")
 	}
-	err = json.Unmarshal(data, &cids)
+	err = json.Unmarshal(data, &subs)
 	if err != nil {
 		log.Fatal(err)
+		fmt.Println("Wrong JSON format")
 	}
-	return cids.Cids
+	subs.Len = len(subs.Cids) + len(subs.Pids)
+	return &subs
 }
 
-func IsExist(filePath string) bool {
+func Exist(filePath string) bool {
 	if _, err := os.Stat(filePath); err != nil {
 		if os.IsNotExist(err) {
 			return false
@@ -67,14 +72,14 @@ func IsExist(filePath string) bool {
 	return true
 }
 
-func GetRecords() map[string]map[string]string {
-	var records map[string]map[string]string
+func GetRecords() map[string]string {
+	var records map[string]string
 	data, err := ioutil.ReadFile(RecordsPath)
 	if err != nil {
 		// error due to non-exisitent file?
-		if IsExist(RecordsPath) {
+		if Exist(RecordsPath) {
 			// record does not exist. create one.
-			ioutil.WriteFile(RecordsPath, []byte{}, 0644)
+			ioutil.WriteFile(RecordsPath, []byte("{}"), 0644)
 		} else {
 			// record exists, but other err.
 			log.Fatal(err)
@@ -89,12 +94,12 @@ func GetRecords() map[string]map[string]string {
 	}
 }
 
-func GetFeeds(ch chan Feeds, cid string) {
+func GetFeeds(ch chan Feeds, id string, mode string) {
 	defer WG.Done()
 	var (
 		feeds Feeds
 	)
-	resp, err := http.Get(fmt.Sprintf(YTFeedUrl, cid))
+	resp, err := http.Get(fmt.Sprintf(YTFeedUrl, mode, id))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,33 +109,40 @@ func GetFeeds(ch chan Feeds, cid string) {
 		log.Fatal(err)
 	}
 	xml.Unmarshal(blobs, &feeds)
-	feeds.ChannelID = cid
+	feeds.ChannelID = id
 	ch <- feeds
 }
 
 func main() {
-	cids := GetSubs()
+	subs := GetSubs()
 	var (
-		ch    = make(chan Feeds, len(cids))
+		ch    = make(chan Feeds, subs.Len)
 		feeds = make(map[string]map[string]string)
 	)
 	records := GetRecords()
-	for _, id := range cids {
+	for _, id := range subs.Cids {
 		WG.Add(1)
-		go GetFeeds(ch, id)
+		go GetFeeds(ch, id, "channel_id")
+	}
+	for _, id := range subs.Pids {
+		WG.Add(1)
+		go GetFeeds(ch, id, "playlist_id")
 	}
 	WG.Wait()
 	close(ch)
 	for feed := range ch {
 		feeds[feed.ChannelID] = map[string]string{}
 		for _, e := range feed.Entries {
-			feeds[feed.ChannelID][e.Link] = e.Title[:30] + "..."
+			if len(e.Title) > 20 {
+				e.Title = e.Title[:20] + "..."
+			}
+			feeds[feed.ChannelID][e.Link] = e.Title
 		}
 	}
 	for k, v := range feeds {
 		fmt.Println("((( " + k + " )))")
-		for kk, vv := range v {
-			fmt.Println(kk, vv)
+		for kk, _ := range v {
+			fmt.Println(kk)
 		}
 	}
 	fmt.Println(records)
