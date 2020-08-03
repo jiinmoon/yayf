@@ -116,8 +116,9 @@ func GetFeeds(ch chan Feeds, id string, mode string) {
 func main() {
 	subs := GetSubs()
 	var (
-		ch    = make(chan Feeds, subs.Len)
-		feeds = make(map[string]map[string]string)
+		ch      = make(chan Feeds, subs.Len)
+		feeds   = make(map[string]map[string]string)
+		toFetch []string
 	)
 	records := GetRecords()
 	for _, id := range subs.Cids {
@@ -145,5 +146,16 @@ func main() {
 			fmt.Println(kk)
 		}
 	}
-	fmt.Println(records)
+	for _, feed := range feeds {
+		for link, _ := range feed {
+			if record, ok := records[link]; ok {
+				fmt.Println("link exists in record", link, "|", record)
+			} else {
+				//don't use it now!
+				//records[link] = ""
+				toFetch = append(toFetch, link)
+			}
+		}
+	}
+	fmt.Println(toFetch)
 }
