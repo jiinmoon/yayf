@@ -43,6 +43,7 @@ TODO
 - [ ] Update records as appropriately and save.
 - [ ] Add more tests to cover the codes.
 - [ ] Consider moving Subscription and Feeds out of main using interface. 
+- [ ] Clean main().
 
 Contacts
 --------

@@ -33,7 +33,7 @@ var (
 type Subscriptions struct {
 	Cids []string `json:"Subscriptions"`
 	Pids []string `json:"Playlists"`
-	Len  int
+	Len  int      // total len of Cids + Pids
 }
 
 type Feeds struct {
@@ -47,20 +47,17 @@ type Entry struct {
 	Title string `xml:"title"`
 }
 
-func GetSubs() *Subscriptions {
-	var subs Subscriptions
+func (s *Subscriptions) GetSubs() error {
 	data, err := ioutil.ReadFile(SubscriptionsPath)
 	if err != nil {
-		log.Fatal(err)
-		fmt.Println("Subscrions file is missing: yayf.subs")
+		return err
 	}
-	err = json.Unmarshal(data, &subs)
+	err = json.Unmarshal(data, &s)
 	if err != nil {
-		log.Fatal(err)
-		fmt.Println("Wrong JSON format")
+		return err
 	}
-	subs.Len = len(subs.Cids) + len(subs.Pids)
-	return &subs
+	s.Len = len(s.Cids) + len(s.Pids)
+	return nil
 }
 
 func Exist(filePath string) bool {
@@ -94,7 +91,21 @@ func GetRecords() map[string]string {
 	}
 }
 
-func GetFeeds(ch chan Feeds, id string, mode string) {
+func (s *Subscriptions) GetFeeds(ch chan Feeds) error {
+	for _, id := range s.Cids {
+		WG.Add(1)
+		go GetFeed(ch, id, "channel_id")
+	}
+	for _, id := range s.Pids {
+		WG.Add(1)
+		go GetFeed(ch, id, "playlist_id")
+	}
+	WG.Wait()
+	close(ch)
+	return nil
+}
+
+func GetFeed(ch chan Feeds, id string, mode string) {
 	defer WG.Done()
 	var (
 		feeds Feeds
@@ -114,23 +125,18 @@ func GetFeeds(ch chan Feeds, id string, mode string) {
 }
 
 func main() {
-	subs := GetSubs()
 	var (
-		ch      = make(chan Feeds, subs.Len)
+		subs    = &Subscriptions{}
 		feeds   = make(map[string]map[string]string)
 		toFetch []string
 	)
+	// read subs
+	subs.GetSubs()
+	// get feeds from each subs
+	ch := make(chan Feeds, subs.Len)
+	subs.GetFeeds(ch)
+	// read records
 	records := GetRecords()
-	for _, id := range subs.Cids {
-		WG.Add(1)
-		go GetFeeds(ch, id, "channel_id")
-	}
-	for _, id := range subs.Pids {
-		WG.Add(1)
-		go GetFeeds(ch, id, "playlist_id")
-	}
-	WG.Wait()
-	close(ch)
 	for feed := range ch {
 		feeds[feed.ChannelID] = map[string]string{}
 		for _, e := range feed.Entries {
